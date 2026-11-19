@@ -1,0 +1,82 @@
+[
+ {
+  "file": "glioma_Te-gl_118.jpg",
+  "label": "glioma",
+  "probs": [
+   0.9112,
+   0.0269,
+   0.0302,
+   0.0317
+  ]
+ },
+ {
+  "file": "glioma_Te-gl_12.jpg",
+  "label": "glioma",
+  "probs": [
+   0.9273,
+   0.0242,
+   0.0218,
+   0.0267
+  ]
+ },
+ {
+  "file": "meningioma_Te-aug-me_22.jpg",
+  "label": "meningioma",
+  "probs": [
+   0.0273,
+   0.9232,
+   0.0267,
+   0.0228
+  ]
+ },
+ {
+  "file": "meningioma_Te-aug-me_24.jpg",
+  "label": "meningioma",
+  "probs": [
+   0.0266,
+   0.9244,
+   0.0237,
+   0.0253
+  ]
+ },
+ {
+  "file": "notumor_Te-no_115.jpg",
+  "label": "notumor",
+  "probs": [
+   0.0297,
+   0.0282,
+   0.9178,
+   0.0243
+  ]
+ },
+ {
+  "file": "notumor_Te-no_117.jpg",
+  "label": "notumor",
+  "probs": [
+   0.0213,
+   0.026,
+   0.9254,
+   0.0273
+  ]
+ },
+ {
+  "file": "pituitary_Te-pi_115.jpg",
+  "label": "pituitary",
+  "probs": [
+   0.0277,
+   0.0261,
+   0.0262,
+   0.92
+  ]
+ },
+ {
+  "file": "pituitary_Te-pi_117.jpg",
+  "label": "pituitary",
+  "probs": [
+   0.0211,
+   0.0272,
+   0.0255,
+   0.9262
+  ]
+ }
+]
