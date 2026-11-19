@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Basira · Brain MRI tumor classifier that runs in your browser</title>
-<meta name="description" content="Classifies a brain MRI slice as glioma, meningioma, pituitary tumor or no tumor, in the browser, with a heat map. Trained and tested without the near-duplicate leakage that inflates public benchmarks.">
+<meta name="description" content="Classifies a brain MRI slice as glioma, meningioma, pituitary tumor or no tumor, in the browser, outlines the tumor. Trained and tested without the near-duplicate leakage that inflates public benchmarks.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
@@ -32,7 +32,8 @@ h1{font-size:clamp(1.9rem,3.6vw,2.9rem);line-height:1.12;font-weight:800;letter-
 .drop strong{display:block;color:#fff;font-size:1.25rem;margin-bottom:6px}
 .drop button{margin-top:16px}
 .viewer .corner{position:absolute;left:14px;bottom:12px;color:#9AA6AC;font-size:.8rem;z-index:3}
-.viewer .toggle{position:absolute;right:12px;bottom:10px;z-index:3;display:none;align-items:center;gap:8px;color:#E6EAEC;font-size:.85rem;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:4px}
+.viewer .toggle label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.viewer .toggle{position:absolute;right:12px;bottom:10px;z-index:3;display:none;align-items:center;gap:14px;color:#E6EAEC;font-size:.85rem;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:4px}
 button,.btn{font:inherit;font-weight:700;border:0;border-radius:4px;padding:11px 18px;background:var(--violet);color:#fff;cursor:pointer}
 button.ghost{background:transparent;color:inherit;border:1px solid currentColor}
 button:focus-visible,.thumb:focus-visible,a:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
@@ -43,6 +44,9 @@ button:focus-visible,.thumb:focus-visible,a:focus-visible{outline:3px solid var(
 .verdict small{display:block;font-size:.95rem;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:8px}
 .flag{border-left:4px solid var(--alert);background:#FCEFEE;padding:10px 14px;font-size:.95rem}
 .flag.calm{border-color:var(--violet);background:var(--violet-soft)}
+.region{display:flex;gap:10px;align-items:baseline;margin-top:14px;font-size:.95rem}
+.region i{flex:none;width:22px;height:0;border-top:3px solid #E5383B;transform:translateY(-4px)}
+.region i.box{border:2px solid #E9B10A;height:12px;width:18px;transform:none}
 .bars{display:grid;gap:10px}
 .bar{display:grid;grid-template-columns:9.5em 1fr 3.6em;align-items:center;gap:12px;font-size:.95rem}
 .bar .track{height:10px;background:#E7EBED;border-radius:5px;overflow:hidden}
@@ -85,12 +89,13 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
 </header>
 
 <h1>Drop a brain MRI slice. See what the model sees.</h1>
-<p class="lede">Four classes: glioma, meningioma, pituitary tumor, no tumor. The model runs inside this page, so the image never leaves your device. It was trained and tested with near-duplicate images removed, which is why its accuracy is 96%, not the 99% that leaked benchmarks report.</p>
+<p class="lede">Four classes: glioma, meningioma, pituitary tumor, no tumor. When it finds a tumor, a second model outlines it. Both run inside this page, so the image never leaves your device. It was trained and tested with near-duplicate images removed, which is why its accuracy is 96%, not the 99% that leaked benchmarks report.</p>
 
 <div class="station">
   <div class="viewer" id="viewer" tabindex="0" role="button" aria-label="Choose an MRI image">
     <canvas id="img" width="384" height="384"></canvas>
     <canvas id="heat" width="384" height="384" style="opacity:.55"></canvas>
+    <canvas id="outline" width="768" height="768"></canvas>
     <div class="drop" id="drop">
       <strong>Drop an MRI image here</strong>
       JPG or PNG of one axial, coronal or sagittal slice
@@ -98,7 +103,7 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
     </div>
     <input type="file" id="file" accept="image/*" hidden>
     <span class="corner" id="corner"></span>
-    <label class="toggle" id="toggle"><input type="checkbox" id="showHeat" checked> Heat map</label>
+    <div class="toggle" id="toggle"><label><input type="checkbox" id="showOutline" checked> Outline</label><label><input type="checkbox" id="showHeat"> Heat map</label></div>
   </div>
   <div class="result" id="result">
     <div class="state" id="state">The model (40 MB) downloads once, the first time you analyse an image; after that it is cached by your browser.</div>
@@ -107,8 +112,9 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
       <div class="verdict" id="verdict"></div>
       <div id="flags"></div>
       <div class="bars" id="bars"></div>
+      <div id="region"></div>
     </div>
-    <p class="note">For research and education, not for diagnosis. The heat map shows which regions pushed the model toward its answer; it is not a tumor outline. “No tumor” is given only when the model is at least 90% sure, so that fewer tumors are missed.</p>
+    <p class="note">For research and education, not for diagnosis. The red outline comes from a second model, trained on tumor masks drawn by radiologists (BRISC 2025); the yellow box marks its extent. The heat map shows which regions pushed the classifier toward its answer. “No tumor” is given only when the model is at least 90% sure, so that fewer tumors are missed.</p>
   </div>
 </div>
 
@@ -144,6 +150,7 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
       </tbody>
     </table>
     <p>Over three training seeds the same recipe gives 95.94 ± 0.23% on the Kaggle test; averaging the three models gives 96.4% and misses 3 of 1,200 tumors. This page runs one of them to keep the download small.</p>
+    <p><b>Tumor outline.</b> A second, smaller model (U-Net with an EfficientNet-B0 encoder, 320×320, 12 MB) draws the red outline. It was trained on 3,507 slices with tumor masks drawn by radiologists in BRISC 2025, plus normal slices with empty masks, after the same twin removal (984 of the 3,933 BRISC segmentation training images had a twin in a test set). On the 860 BRISC test tumors it overlaps the radiologists’ outline with a Dice score of 0.86 (meningioma 0.93, pituitary 0.87, glioma 0.76, whose borders are the least clear) and finds 98.9% of the tumors. It runs only when the classifier reports a tumor; on normal slices it drew an outline on 1 of 140 BRISC images and on 12% of Kaggle images from other sources.</p>
     <p><b>Limits.</b> Single 2D slices, not volumes. No pituitary images in T1 or T2 were available for training. Twin removal catches near-identical slices, not every slice of the same patient. Images from scanners or protocols unlike these sets may be misclassified with high confidence.</p>
   </div>
 </section>
@@ -186,6 +193,85 @@ async function loadModel() {
     } catch (e) { console.warn("model failed, trying next", e); }
   }
   throw new Error("The model could not be loaded in this browser.");
+}
+
+// ---- tumor outline: a U-Net trained on radiologists' masks (notebook 11) ----
+const OUTLINE = {parts: [1, 2].map(i => `model/outline_fp16.part${i}`), size: 320, t: 0.4, minFrac: 0.001};
+const octx = $("outline").getContext("2d");
+let oSession = null, lastOutline = null;
+async function loadOutline() {
+  if (oSession) return oSession;
+  const bar = $("progress"), fill = bar.firstElementChild; bar.hidden = false; fill.style.width = "0";
+  const parts = []; let k = 0;
+  for (const u of OUTLINE.parts) { parts.push(await fetchWithProgress(u, (g, t) => fill.style.width = (100 * (k + (t ? g / t : .5)) / OUTLINE.parts.length) + "%")); k++; }
+  const bytes = new Uint8Array(parts.reduce((a, p) => a + p.length, 0)); let o = 0; for (const p of parts) { bytes.set(p, o); o += p.length; }
+  oSession = await ort.InferenceSession.create(bytes, {executionProviders: ["wasm"]}); bar.hidden = true; return oSession;
+}
+// connected regions above the threshold; regions smaller than minFrac of the slice are dropped
+function regionsOf(prob, n) {
+  const N = n * n, lab = new Int32Array(N), comps = [], stack = new Int32Array(N), minPix = OUTLINE.minFrac * N;
+  for (let s0 = 0; s0 < N; s0++) {
+    if (lab[s0] || prob[s0] < OUTLINE.t) continue;
+    const id = comps.length + 1; let sp = 0, cnt = 0, x0 = n, y0 = n, x1 = -1, y1 = -1; stack[sp++] = s0; lab[s0] = id;
+    while (sp) {
+      const i = stack[--sp], x = i % n, y = (i - x) / n; cnt++;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const j of [x > 0 ? i - 1 : -1, x < n - 1 ? i + 1 : -1, y > 0 ? i - n : -1, y < n - 1 ? i + n : -1])
+        if (j >= 0 && !lab[j] && prob[j] >= OUTLINE.t) { lab[j] = id; stack[sp++] = j; }
+    }
+    comps.push({id, n: cnt, x0, y0, x1, y1});
+  }
+  const keep = comps.filter(c => c.n >= minPix).sort((a, b) => b.n - a.n), ok = new Uint8Array(comps.length + 2);
+  keep.forEach(c => ok[c.id] = 1);
+  const field = new Float32Array(N); for (let i = 0; i < N; i++) if (ok[lab[i]]) field[i] = prob[i];
+  return {field, comps: keep};
+}
+async function runOutline() {
+  const n = OUTLINE.size, c = document.createElement("canvas"); c.width = c.height = n; const cx = c.getContext("2d");
+  cx.imageSmoothingQuality = "high"; cx.drawImage(imgC, 0, 0, n, n);
+  const px = cx.getImageData(0, 0, n, n).data, P = n * n, x = new Float32Array(3 * P); let brain = 0;
+  for (let i = 0; i < P; i++) {
+    x[i] = px[4 * i] / 255; x[P + i] = px[4 * i + 1] / 255; x[2 * P + i] = px[4 * i + 2] / 255;
+    if (.299 * px[4 * i] + .587 * px[4 * i + 1] + .114 * px[4 * i + 2] > 12) brain++;
+  }
+  const s = await loadOutline(), r = await s.run({image: new ort.Tensor("float32", x, [1, 3, n, n])});
+  const out = regionsOf(r.mask.data, n); out.brain = brain; return out;
+}
+// marching squares on the kept probability field gives a smooth outline at the threshold
+function drawOutline() {
+  const W = $("outline").width; octx.clearRect(0, 0, W, W);
+  if (!lastOutline || !$("showOutline").checked || !lastOutline.comps.length) return;
+  const n = OUTLINE.size, f = lastOutline.field, t = OUTLINE.t, k = W / n, segs = [];
+  const at = (x, y) => (x < 0 || y < 0 || x >= n || y >= n) ? 0 : f[y * n + x];
+  const lerp = (a, b) => (t - a) / (b - a);
+  for (let y = -1; y < n; y++) for (let x = -1; x < n; x++) {
+    const a = at(x, y), b = at(x + 1, y), c = at(x + 1, y + 1), d = at(x, y + 1);
+    const m = (a >= t) | (b >= t) << 1 | (c >= t) << 2 | (d >= t) << 3; if (m === 0 || m === 15) continue;
+    const T = [x + lerp(a, b), y], R = [x + 1, y + lerp(b, c)], B = [x + lerp(d, c), y + 1], L = [x, y + lerp(a, d)];
+    const E = {1: [[L, T]], 2: [[T, R]], 3: [[L, R]], 4: [[R, B]], 5: [[L, T], [R, B]], 6: [[T, B]], 7: [[L, B]], 8: [[B, L]],
+               9: [[T, B]], 10: [[T, R], [B, L]], 11: [[R, B]], 12: [[R, L]], 13: [[T, R]], 14: [[L, T]]}[m];
+    for (const s of E) segs.push(s);
+  }
+  const path = new Path2D(); for (const [p, q] of segs) { path.moveTo((p[0] + .5) * k, (p[1] + .5) * k); path.lineTo((q[0] + .5) * k, (q[1] + .5) * k); }
+  octx.lineJoin = octx.lineCap = "round";
+  octx.strokeStyle = "rgba(0,0,0,.65)"; octx.lineWidth = 7; octx.stroke(path);
+  octx.strokeStyle = "#E5383B"; octx.lineWidth = 3.5; octx.stroke(path);
+  const big = lastOutline.comps[0];
+  lastOutline.comps.filter(c => c === big || c.n >= .25 * big.n).forEach((c, i) => {
+    const pad = 6 * k, x0 = c.x0 * k - pad, y0 = c.y0 * k - pad, w = (c.x1 - c.x0 + 1) * k + 2 * pad, h = (c.y1 - c.y0 + 1) * k + 2 * pad;
+    octx.strokeStyle = "#E9B10A"; octx.lineWidth = 3; octx.setLineDash([]); octx.strokeRect(x0, y0, w, h);
+    if (i === 0) {
+      const label = "Tumor", fs = 22; octx.font = `700 ${fs}px "Atkinson Hyperlegible Next", system-ui, sans-serif`;
+      const tw = octx.measureText(label).width + 16, ly = y0 - fs - 10 < 0 ? y0 + h + 4 : y0 - fs - 10;
+      octx.fillStyle = "#E9B10A"; octx.fillRect(x0 - 1.5, ly, tw, fs + 10); octx.fillStyle = "#14202B"; octx.fillText(label, x0 + 7, ly + fs + 1);
+    }
+  });
+}
+function showRegion(o) {
+  if (!o) { $("region").innerHTML = ""; return; }
+  if (!o.comps.length) { $("region").innerHTML = `<div class="flag calm">The outline model found no clear tumor region on this slice, so nothing is drawn.</div>`; return; }
+  const area = o.comps.reduce((a, c) => a + c.n, 0), pct = 100 * area / Math.max(1, o.brain);
+  $("region").innerHTML = `<p class="region"><i></i><span>Tumor outline: covers about <b>${pct < 1 ? pct.toFixed(1) : Math.round(pct)}%</b> of the head on this slice${o.comps.length > 1 ? ` (${o.comps.length} regions)` : ""}.</span></p>`;
 }
 
 // crop the head (drop the black margin), keep the aspect ratio, pad to a 384 x 384 black square
@@ -245,13 +331,18 @@ function show(probs) {
 
 async function analyse(image, label) {
   $("drop").style.display = "none"; $("corner").textContent = label || "";
-  const x = prepare(image); hctx.clearRect(0, 0, SIZE, SIZE); $("out").hidden = true;
+  const x = prepare(image); hctx.clearRect(0, 0, SIZE, SIZE); lastOutline = null; drawOutline(); showRegion(null); $("out").hidden = true;
   try {
     const s = await loadModel(); $("state").textContent = "Analysing…";
     const t0 = performance.now(), r = await s.run({image: x});
     const cls = show(r.probs.data); lastCam = [r.cam.data, r.cam.dims]; lastClass = cls; drawHeat(r.cam.data, r.cam.dims, cls);
     $("toggle").style.display = cls === NT ? "none" : "flex";
     $("state").textContent = `Analysed in ${Math.round(performance.now() - t0)} ms on this device.`;
+    if (cls !== NT) {
+      $("state").textContent = "Outlining the tumor…"; const t1 = performance.now();
+      lastOutline = await runOutline(); drawOutline(); showRegion(lastOutline);
+      $("state").textContent = `Classified in ${Math.round(t1 - t0)} ms and outlined in ${Math.round(performance.now() - t1)} ms on this device.`;
+    }
   } catch (e) { $("state").textContent = e.message; }
 }
 function fromFile(f) {
@@ -266,6 +357,7 @@ $("file").onchange = e => fromFile(e.target.files[0]);
 ["dragleave", "drop"].forEach(ev => $("viewer").addEventListener(ev, e => { e.preventDefault(); $("viewer").classList.remove("drag"); }));
 $("viewer").addEventListener("drop", e => fromFile(e.dataTransfer.files[0]));
 $("showHeat").onchange = () => lastCam && drawHeat(lastCam[0], lastCam[1], lastClass);
+$("showOutline").onchange = drawOutline;
 $("toggle").onclick = e => e.stopPropagation();
 
 fetch("examples/examples.json").then(r => r.json()).then(ex => {
