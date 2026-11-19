@@ -101,7 +101,7 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
     <label class="toggle" id="toggle"><input type="checkbox" id="showHeat" checked> Heat map</label>
   </div>
   <div class="result" id="result">
-    <div class="state" id="state">The model (21 MB) downloads once, the first time you analyse an image.</div>
+    <div class="state" id="state">The model (40 MB) downloads once, the first time you analyse an image; after that it is cached by your browser.</div>
     <div class="progress" id="progress" hidden><div></div></div>
     <div id="out" hidden>
       <div class="verdict" id="verdict"></div>
@@ -134,7 +134,7 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
 <section class="read" id="model">
   <h2>Model card</h2>
   <div class="body">
-    <p>EfficientNetV2-S (ImageNet-21k pretrained), 384×384 input, fine-tuned on 9,026 slices from the Kaggle set v2, BRISC 2025 and a T1 / contrast T1 / T2 collection (Feltrin), after removing twins of all test images. Quantised to 8 bits for the browser.</p>
+    <p>EfficientNetV2-S (ImageNet-21k pretrained), 384×384 input, fine-tuned on 9,026 slices from the Kaggle set v2, BRISC 2025 and a T1 / contrast T1 / T2 collection (Feltrin), after removing twins of all test images. Weights stored in 16-bit floats for the browser (40 MB) and computed in 32-bit, which gives the same answers as the original model on both test sets; 8-bit quantisation was tried and rejected because it dropped accuracy to 85%.</p>
     <table>
       <thead><tr><th>Test set</th><th class="n">Images</th><th class="n">Accuracy</th><th class="n">Tumors missed</th><th class="n">False alarms</th></tr></thead>
       <tbody id="cardRows">
@@ -155,7 +155,7 @@ footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
 <script>
 const CLASSES = ["Glioma", "Meningioma", "No tumor", "Pituitary tumor"], NT = 2, SIZE = 384;
 const NO_TUMOR_MIN = 0.90, LOW_CONF = 0.785;
-const MODELS = [{url: "model/basira_int8.onnx"}, {parts: ["model/basira_fp16.part1", "model/basira_fp16.part2"]}];
+const MODELS = [{parts: [1, 2, 3, 4].map(i => `model/basira_fp16.part${i}`)}];
 const $ = id => document.getElementById(id);
 const imgC = $("img"), heatC = $("heat"), ictx = imgC.getContext("2d"), hctx = heatC.getContext("2d");
 let session = null, lastCam = null, lastClass = null;
