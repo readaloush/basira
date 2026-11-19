@@ -127,3 +127,20 @@ Three-seed ensembles (threshold 0.9 chosen on BRISC):
 
 Note on choice: by the dev rule alone (BRISC accuracy) the KB ensemble would be chosen; BRISC contains only contrast T1, so it
 cannot measure sequence robustness. The KBF ensemble is the recommended model for use; both are reported.
+
+## Notebook 11 · Tumor outline (U-Net, EfficientNet-B0, 320 px, BRISC 2025 masks)
+
+Kaggle version 371327848. Pool: BRISC segmentation train (3,933) + BRISC classification no-tumor train (1,067, empty masks).
+Twin removal against all test sets (BRISC seg test, BRISC cls test, Kaggle v2 test): **984 of 3,933 BRISC segmentation training images removed** (25%), 7 of 1,067 no-tumor.
+Train 3,507 / validation 502 (group split). 40 epochs, Dice + BCE, AdamW 5e-4, cosine; best validation Dice 0.860 (epoch 37).
+Outline rule chosen on validation: threshold 0.4, drop regions under 0.1% of the slice.
+
+| BRISC seg test | n | Dice | IoU | Tumors found |
+|---|---|---|---|---|
+| All | 860 | 0.8585 | 0.7874 | 98.95% |
+| Glioma | 254 | 0.7628 | 0.6727 | 98.03% |
+| Meningioma | 306 | 0.9304 | 0.8833 | 99.02% |
+| Pituitary | 300 | 0.8663 | 0.7868 | 99.67% |
+
+Outline drawn on no-tumor slices: BRISC test 1 / 140 (0.7%); Kaggle v2 test 48 / 400 (12%).
+Browser model (fp16 weights, fp32 compute, no flip TTA): Dice 0.8539, IoU 0.7835, found 98.37%.
