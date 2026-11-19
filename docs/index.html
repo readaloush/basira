@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basira · Brain MRI tumor classifier that runs in your browser</title>
+<meta name="description" content="Classifies a brain MRI slice as glioma, meningioma, pituitary tumor or no tumor, in the browser, with a heat map. Trained and tested without the near-duplicate leakage that inflates public benchmarks.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F2F4F3;--ink:#14202B;--muted:#56636B;--rule:#CFD6D9;--panel:#FFFFFF;--violet:#5B3FD1;--violet-soft:#ECE8FB;--alert:#B42318;--ok:#1D6B4F}
+*{box-sizing:border-box}
+html{background:var(--paper);color:var(--ink);font:17px/1.55 "Atkinson Hyperlegible Next",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0}
+a{color:var(--violet)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+header.top{display:flex;align-items:baseline;justify-content:space-between;gap:24px;padding:26px 0 18px;border-bottom:1px solid var(--rule)}
+.brand{display:flex;align-items:baseline;gap:14px}
+.brand b{font-size:1.45rem;font-weight:800;letter-spacing:-.01em}
+.brand span{color:var(--muted)}
+nav a{color:var(--ink);text-decoration:none;margin-left:22px;font-weight:500}
+nav a:hover{color:var(--violet)}
+h1{font-size:clamp(1.9rem,3.6vw,2.9rem);line-height:1.12;font-weight:800;letter-spacing:-.02em;margin:38px 0 10px;max-width:22ch}
+.lede{color:var(--muted);max-width:62ch;margin:0 0 28px}
+
+/* the reading station */
+.station{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:0;background:var(--panel);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.viewer{background:#000;position:relative;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.viewer canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:auto}
+.viewer.drag{outline:3px dashed var(--violet);outline-offset:-14px}
+.drop{position:relative;text-align:center;color:#C9D1D5;padding:24px;z-index:2}
+.drop strong{display:block;color:#fff;font-size:1.25rem;margin-bottom:6px}
+.drop button{margin-top:16px}
+.viewer .corner{position:absolute;left:14px;bottom:12px;color:#9AA6AC;font-size:.8rem;z-index:3}
+.viewer .toggle{position:absolute;right:12px;bottom:10px;z-index:3;display:none;align-items:center;gap:8px;color:#E6EAEC;font-size:.85rem;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:4px}
+button,.btn{font:inherit;font-weight:700;border:0;border-radius:4px;padding:11px 18px;background:var(--violet);color:#fff;cursor:pointer}
+button.ghost{background:transparent;color:inherit;border:1px solid currentColor}
+button:focus-visible,.thumb:focus-visible,a:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
+
+.result{padding:30px 32px;display:flex;flex-direction:column;gap:18px;min-height:100%}
+.state{color:var(--muted)}
+.verdict{font-size:2.3rem;font-weight:800;line-height:1.05;letter-spacing:-.02em}
+.verdict small{display:block;font-size:.95rem;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:8px}
+.flag{border-left:4px solid var(--alert);background:#FCEFEE;padding:10px 14px;font-size:.95rem}
+.flag.calm{border-color:var(--violet);background:var(--violet-soft)}
+.bars{display:grid;gap:10px}
+.bar{display:grid;grid-template-columns:9.5em 1fr 3.6em;align-items:center;gap:12px;font-size:.95rem}
+.bar .track{height:10px;background:#E7EBED;border-radius:5px;overflow:hidden}
+.bar .fill{height:100%;background:var(--ink);width:0;transition:width .5s ease}
+.bar.top .fill{background:var(--violet)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:.85rem;color:var(--muted);margin-top:auto;border-top:1px solid var(--rule);padding-top:14px}
+.progress{height:4px;background:#E7EBED;border-radius:2px;overflow:hidden}
+.progress div{height:100%;width:0;background:var(--violet);transition:width .2s}
+
+.examples{margin:22px 0 0}
+.examples p{margin:0 0 10px;color:var(--muted)}
+.thumbs{display:grid;grid-template-columns:repeat(8,1fr);gap:10px}
+.thumb{aspect-ratio:1/1;background:#000 center/cover no-repeat;border:2px solid transparent;border-radius:4px;cursor:pointer;padding:0}
+.thumb:hover{border-color:var(--violet)}
+
+/* the findings */
+section.read{display:grid;grid-template-columns:15rem minmax(0,1fr);gap:40px;padding:64px 0 10px;border-bottom:1px solid var(--rule)}
+section.read h2{font-size:1.35rem;line-height:1.25;margin:0;font-weight:800}
+section.read .body{max-width:70ch}
+section.read p{margin:0 0 14px}
+.big{font-size:1.25rem;line-height:1.45}
+table{border-collapse:collapse;width:100%;margin:8px 0 18px;font-size:.93rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:700;border-bottom:2px solid var(--ink)}
+td.n,th.n{text-align:right}
+tr.hl td{background:var(--violet-soft)}
+.findings{display:grid;gap:22px;margin:4px 0 8px}
+.finding b{display:block;font-size:2rem;line-height:1;font-weight:800;color:var(--violet);margin-bottom:6px}
+footer{padding:40px 0 60px;color:var(--muted);font-size:.88rem}
+@media (max-width:900px){.station{grid-template-columns:1fr}.thumbs{grid-template-columns:repeat(4,1fr)}section.read{grid-template-columns:1fr;gap:12px}nav a{margin-left:14px}}
+@media (prefers-reduced-motion:reduce){.bar .fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="brand"><b>Basira</b><span>بصيرة · brain MRI tumor classifier</span></div>
+  <nav><a href="#how">How it was tested</a><a href="#model">Model card</a><a href="https://github.com/readaloush/basira">Code</a></nav>
+</header>
+
+<h1>Drop a brain MRI slice. See what the model sees.</h1>
+<p class="lede">Four classes: glioma, meningioma, pituitary tumor, no tumor. The model runs inside this page, so the image never leaves your device. It was trained and tested with near-duplicate images removed, which is why its accuracy is 96%, not the 99% that leaked benchmarks report.</p>
+
+<div class="station">
+  <div class="viewer" id="viewer" tabindex="0" role="button" aria-label="Choose an MRI image">
+    <canvas id="img" width="384" height="384"></canvas>
+    <canvas id="heat" width="384" height="384" style="opacity:.55"></canvas>
+    <div class="drop" id="drop">
+      <strong>Drop an MRI image here</strong>
+      JPG or PNG of one axial, coronal or sagittal slice
+      <div><button type="button" id="pick">Choose image</button></div>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <span class="corner" id="corner"></span>
+    <label class="toggle" id="toggle"><input type="checkbox" id="showHeat" checked> Heat map</label>
+  </div>
+  <div class="result" id="result">
+    <div class="state" id="state">The model (21 MB) downloads once, the first time you analyse an image.</div>
+    <div class="progress" id="progress" hidden><div></div></div>
+    <div id="out" hidden>
+      <div class="verdict" id="verdict"></div>
+      <div id="flags"></div>
+      <div class="bars" id="bars"></div>
+    </div>
+    <p class="note">For research and education, not for diagnosis. The heat map shows which regions pushed the model toward its answer; it is not a tumor outline. “No tumor” is given only when the model is at least 90% sure, so that fewer tumors are missed.</p>
+  </div>
+</div>
+
+<div class="examples">
+  <p>Or try a test image the model has never seen (Kaggle brain tumor MRI dataset v2, CC BY 4.0):</p>
+  <div class="thumbs" id="thumbs"></div>
+</div>
+
+<section class="read" id="how">
+  <h2>Why 96%, not 99%</h2>
+  <div class="body">
+    <p class="big">Public brain-tumor sets reuse near-identical slices of the same patients in training and test. A model that has seen the twin of a test image scores high without recognising the tumor.</p>
+    <div class="findings">
+      <div class="finding"><b>30%</b>of the test images in version 2 of the popular Kaggle set, released as de-duplicated, still have a near-identical twin in its training folder (362 of the 400 no-tumor images).</div>
+      <div class="finding"><b>107</b>Kaggle test images appear byte for byte in the training split of BRISC 2025, so BRISC is not an independent test for models trained on the Kaggle set.</div>
+      <div class="finding"><b>22%</b>of test gliomas from other hospitals were recognised by a model scoring 95.9% overall: every training glioma came from one source, and the model learned the source.</div>
+      <div class="finding"><b>48% → 91%</b>accuracy on T1 and T2 slices once training includes those sequences; models trained on the standard sets miss most gliomas imaged that way.</div>
+    </div>
+    <p>So every training image with a twin (correlation ≥ 0.90) in any test set was removed, the model and the “no tumor” threshold were chosen on the BRISC test, and the Kaggle test was scored once with those choices fixed.</p>
+  </div>
+</section>
+
+<section class="read" id="model">
+  <h2>Model card</h2>
+  <div class="body">
+    <p>EfficientNetV2-S (ImageNet-21k pretrained), 384×384 input, fine-tuned on 9,026 slices from the Kaggle set v2, BRISC 2025 and a T1 / contrast T1 / T2 collection (Feltrin), after removing twins of all test images. Quantised to 8 bits for the browser.</p>
+    <table>
+      <thead><tr><th>Test set</th><th class="n">Images</th><th class="n">Accuracy</th><th class="n">Tumors missed</th><th class="n">False alarms</th></tr></thead>
+      <tbody id="cardRows">
+        <tr><td>Kaggle v2 test (final, scored once)</td><td class="n">1,600</td><td class="n">96.2%</td><td class="n">8 of 1,200</td><td class="n">13 of 400</td></tr>
+        <tr><td>BRISC 2025 test (used to choose)</td><td class="n">1,000</td><td class="n">97.9%</td><td class="n">2 of 860</td><td class="n">2 of 140</td></tr>
+        <tr><td>Held-out T1 / T1C+ / T2 slices</td><td class="n">729</td><td class="n">91.8%</td><td class="n">7</td><td class="n">10</td></tr>
+      </tbody>
+    </table>
+    <p>Over three training seeds the same recipe gives 95.94 ± 0.23% on the Kaggle test; averaging the three models gives 96.4% and misses 3 of 1,200 tumors. This page runs one of them to keep the download small.</p>
+    <p><b>Limits.</b> Single 2D slices, not volumes. No pituitary images in T1 or T2 were available for training. Twin removal catches near-identical slices, not every slice of the same patient. Images from scanners or protocols unlike these sets may be misclassified with high confidence.</p>
+  </div>
+</section>
+
+<footer>Basira · Read Aloush · <a href="https://readaloush.com">readaloush.com</a> · Data: Kaggle brain tumor MRI dataset (M. Nickparvar, CC BY 4.0), BRISC 2025 (Fateh et al., CC BY 4.0), Brain Tumor MRI Images 17 Classes (F. Feltrin).</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script>
+const CLASSES = ["Glioma", "Meningioma", "No tumor", "Pituitary tumor"], NT = 2, SIZE = 384;
+const NO_TUMOR_MIN = 0.90, LOW_CONF = 0.785;
+const MODELS = [{url: "model/basira_int8.onnx"}, {parts: ["model/basira_fp16.part1", "model/basira_fp16.part2"]}];
+const $ = id => document.getElementById(id);
+const imgC = $("img"), heatC = $("heat"), ictx = imgC.getContext("2d"), hctx = heatC.getContext("2d");
+let session = null, lastCam = null, lastClass = null;
+
+async function fetchWithProgress(url, onBytes) {
+  const r = await fetch(url); if (!r.ok) throw new Error(url + " " + r.status);
+  const total = +r.headers.get("content-length") || 0, reader = r.body.getReader(), chunks = []; let got = 0;
+  for (;;) { const {done, value} = await reader.read(); if (done) break; chunks.push(value); got += value.length; onBytes(got, total); }
+  const out = new Uint8Array(got); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; } return out;
+}
+async function loadModel() {
+  if (session) return session;
+  const bar = $("progress"), fill = bar.firstElementChild; bar.hidden = false;
+  ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+  for (const m of MODELS) {
+    try {
+      $("state").textContent = "Downloading the model…";
+      let bytes;
+      if (m.url) bytes = await fetchWithProgress(m.url, (g, t) => fill.style.width = (t ? 100 * g / t : 50) + "%");
+      else {
+        const parts = []; let k = 0;
+        for (const u of m.parts) { parts.push(await fetchWithProgress(u, (g, t) => fill.style.width = (100 * (k + (t ? g / t : .5)) / m.parts.length) + "%")); k++; }
+        bytes = new Uint8Array(parts.reduce((a, p) => a + p.length, 0)); let o = 0; for (const p of parts) { bytes.set(p, o); o += p.length; }
+      }
+      $("state").textContent = "Starting the model…";
+      session = await ort.InferenceSession.create(bytes, {executionProviders: ["wasm"]});
+      bar.hidden = true; return session;
+    } catch (e) { console.warn("model failed, trying next", e); }
+  }
+  throw new Error("The model could not be loaded in this browser.");
+}
+
+// crop the head (drop the black margin), keep the aspect ratio, pad to a 384 x 384 black square
+function prepare(image) {
+  const w = image.naturalWidth || image.width, h = image.naturalHeight || image.height;
+  const s = Math.min(1, 192 / Math.max(w, h)), sw = Math.max(1, Math.round(w * s)), sh = Math.max(1, Math.round(h * s));
+  const t = document.createElement("canvas"); t.width = sw; t.height = sh; const tc = t.getContext("2d");
+  tc.imageSmoothingQuality = "high"; tc.drawImage(image, 0, 0, sw, sh);
+  const d = tc.getImageData(0, 0, sw, sh).data; let x0 = sw, y0 = sh, x1 = -1, y1 = -1, n = 0;
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+    const i = 4 * (y * sw + x), g = .299 * d[i] + .587 * d[i + 1] + .114 * d[i + 2];
+    if (g > 12) { n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  let cx = 0, cy = 0, cw = w, ch = h;
+  if (n > 100 * s * s && x1 > x0 && y1 > y0) {
+    const pad = 6; cx = Math.max(0, x0 / s - pad); cy = Math.max(0, y0 / s - pad);
+    cw = Math.min(w, (x1 + 1) / s + pad) - cx; ch = Math.min(h, (y1 + 1) / s + pad) - cy;
+  }
+  const k = SIZE / Math.max(cw, ch), dw = Math.round(cw * k), dh = Math.round(ch * k);
+  ictx.fillStyle = "#000"; ictx.fillRect(0, 0, SIZE, SIZE); ictx.imageSmoothingQuality = "high";
+  ictx.drawImage(image, cx, cy, cw, ch, (SIZE - dw) / 2, (SIZE - dh) / 2, dw, dh);
+  const px = ictx.getImageData(0, 0, SIZE, SIZE).data, x = new Float32Array(3 * SIZE * SIZE), P = SIZE * SIZE;
+  for (let i = 0; i < P; i++) { x[i] = px[4 * i] / 255; x[P + i] = px[4 * i + 1] / 255; x[2 * P + i] = px[4 * i + 2] / 255; }
+  return new ort.Tensor("float32", x, [1, 3, SIZE, SIZE]);
+}
+
+const STOPS = [[0, [0, 0, 0, 0]], [.3, [0, 0, 0, 0]], [.5, [91, 63, 209, 130]], [.75, [230, 80, 120, 200]], [1, [255, 214, 90, 240]]];
+function colour(v) {
+  for (let i = 1; i < STOPS.length; i++) if (v <= STOPS[i][0]) {
+    const [a, ca] = STOPS[i - 1], [b, cb] = STOPS[i], t = (v - a) / (b - a); return ca.map((c, j) => c + t * (cb[j] - c));
+  }
+  return STOPS[STOPS.length - 1][1];
+}
+function drawHeat(cam, dims, cls) {
+  hctx.clearRect(0, 0, SIZE, SIZE); if (cls === NT || !$("showHeat").checked) return;
+  const [, , hh, ww] = dims, off = cls * hh * ww; let mx = 0;
+  for (let i = 0; i < hh * ww; i++) mx = Math.max(mx, cam[off + i]);
+  if (mx <= 0) return;
+  const small = document.createElement("canvas"); small.width = ww; small.height = hh; const sc = small.getContext("2d"), im = sc.createImageData(ww, hh);
+  for (let i = 0; i < hh * ww; i++) { const c = colour(Math.max(0, cam[off + i]) / mx); im.data.set(c.map(Math.round), 4 * i); }
+  sc.putImageData(im, 0, 0); hctx.imageSmoothingEnabled = true; hctx.imageSmoothingQuality = "high"; hctx.drawImage(small, 0, 0, SIZE, SIZE);
+}
+
+function show(probs) {
+  const p = Array.from(probs); let a = p.indexOf(Math.max(...p)); const flags = [];
+  if (a === NT && p[NT] < NO_TUMOR_MIN) {
+    const t = p.map((v, i) => i === NT ? -1 : v); a = t.indexOf(Math.max(...t));
+    flags.push(`<div class="flag">Not called normal: the model was ${Math.round(100 * p[NT])}% sure of no tumor, below the 90% it needs. Most likely tumor type shown.</div>`);
+  }
+  if (Math.max(...p) < LOW_CONF) flags.push(`<div class="flag calm">Low confidence (${Math.round(100 * Math.max(...p))}%). Treat this answer as uncertain; images unlike the training data often look like this.</div>`);
+  $("verdict").innerHTML = CLASSES[a] + `<small>${a === NT ? "No tumor found" : "Tumor suspected"} · probability ${Math.round(100 * p[a])}%</small>`;
+  $("flags").innerHTML = flags.join("");
+  $("bars").innerHTML = CLASSES.map((c, i) => `<div class="bar${i === a ? " top" : ""}"><span>${c}</span><div class="track"><div class="fill" style="width:0"></div></div><span class="v">${(100 * p[i]).toFixed(1)}%</span></div>`).join("");
+  requestAnimationFrame(() => document.querySelectorAll(".bar .fill").forEach((f, i) => f.style.width = (100 * p[i]).toFixed(1) + "%"));
+  $("out").hidden = false; return a;
+}
+
+async function analyse(image, label) {
+  $("drop").style.display = "none"; $("corner").textContent = label || "";
+  const x = prepare(image); hctx.clearRect(0, 0, SIZE, SIZE); $("out").hidden = true;
+  try {
+    const s = await loadModel(); $("state").textContent = "Analysing…";
+    const t0 = performance.now(), r = await s.run({image: x});
+    const cls = show(r.probs.data); lastCam = [r.cam.data, r.cam.dims]; lastClass = cls; drawHeat(r.cam.data, r.cam.dims, cls);
+    $("toggle").style.display = cls === NT ? "none" : "flex";
+    $("state").textContent = `Analysed in ${Math.round(performance.now() - t0)} ms on this device.`;
+  } catch (e) { $("state").textContent = e.message; }
+}
+function fromFile(f) {
+  if (!f || !f.type.startsWith("image/")) { $("state").textContent = "Choose an image file (JPG or PNG)."; return; }
+  const im = new Image(); im.onload = () => { analyse(im, f.name); URL.revokeObjectURL(im.src); }; im.src = URL.createObjectURL(f);
+}
+$("pick").onclick = e => { e.stopPropagation(); $("file").click(); };
+$("viewer").onclick = () => $("file").click();
+$("viewer").onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } };
+$("file").onchange = e => fromFile(e.target.files[0]);
+["dragenter", "dragover"].forEach(ev => $("viewer").addEventListener(ev, e => { e.preventDefault(); $("viewer").classList.add("drag"); }));
+["dragleave", "drop"].forEach(ev => $("viewer").addEventListener(ev, e => { e.preventDefault(); $("viewer").classList.remove("drag"); }));
+$("viewer").addEventListener("drop", e => fromFile(e.dataTransfer.files[0]));
+$("showHeat").onchange = () => lastCam && drawHeat(lastCam[0], lastCam[1], lastClass);
+$("toggle").onclick = e => e.stopPropagation();
+
+fetch("examples/examples.json").then(r => r.json()).then(ex => {
+  $("thumbs").innerHTML = ex.map((e, i) => `<button class="thumb" data-i="${i}" style="background-image:url('examples/${encodeURIComponent(e.file)}')" aria-label="Example ${i + 1}, labelled ${e.label}"></button>`).join("");
+  document.querySelectorAll(".thumb").forEach(b => b.onclick = () => {
+    const e = ex[+b.dataset.i], im = new Image(); im.crossOrigin = "anonymous";
+    im.onload = () => analyse(im, "Example · labelled " + e.label.replace("notumor", "no tumor")); im.src = "examples/" + encodeURIComponent(e.file);
+  });
+}).catch(() => $("thumbs").parentElement.hidden = true);
+</script>
+</body>
+</html>
