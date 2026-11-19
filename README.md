@@ -3,7 +3,7 @@
 **Brain MRI tumor classification, evaluated without the leakage that inflates public benchmarks.**
 Four classes: glioma, meningioma, pituitary tumor, no tumor.
 
-**Demo:** [readaloush.github.io/basira](https://readaloush.github.io/basira): drop an MRI slice; the model runs in your browser (ONNX Runtime Web, 21 MB, int8) and shows a heat map.
+**Demo:** [readaloush.github.io/basira](https://readaloush.github.io/basira): drop an MRI slice; the model runs in your browser (ONNX Runtime Web, 40 MB) and shows a heat map.
 
 Public brain-tumor MRI sets are routinely reported above 99% accuracy. This project measures how much of that comes from near-duplicate images shared between training and test, and trains a model under a protocol that removes them.
 
