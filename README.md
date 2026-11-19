@@ -3,7 +3,7 @@
 **Brain MRI tumor classification, evaluated without the leakage that inflates public benchmarks.**
 Four classes: glioma, meningioma, pituitary tumor, no tumor.
 
-**Demo:** [readaloush.github.io/basira](https://readaloush.github.io/basira): drop an MRI slice; the model runs in your browser (ONNX Runtime Web, 40 MB) and shows a heat map.
+**Demo:** [readaloush.github.io/basira](https://readaloush.github.io/basira): drop an MRI slice; the classifier runs in your browser (ONNX Runtime Web, 40 MB), and when it finds a tumor a second model (12 MB) outlines it.
 
 Public brain-tumor MRI sets are routinely reported above 99% accuracy. This project measures how much of that comes from near-duplicate images shared between training and test, and trains a model under a protocol that removes them.
 
@@ -32,6 +32,19 @@ Public brain-tumor MRI sets are routinely reported above 99% accuracy. This proj
 | EfficientNetV2-S 384, + T1/T2 data, 3 seeds | 95.94 ± 0.23 | 9.7 ± 3.8 | 11.0 ± 2.0 |
 | Same, three seeds averaged | **96.44** | **3** | 19 |
 
+## Tumor outline (BRISC 2025 segmentation test, 860 tumors)
+
+U-Net with an EfficientNet-B0 encoder, 320 px, trained on the radiologist masks of BRISC 2025 after the same twin removal: **984 of the 3,933 BRISC segmentation training images (25%) have a near-identical twin in a test set** and were removed.
+
+| | Dice | IoU | Tumors found |
+|---|---|---|---|
+| All | **0.859** | 0.787 | 98.9% |
+| Meningioma (306) | 0.930 | 0.883 | 99.0% |
+| Pituitary (300) | 0.866 | 0.787 | 99.7% |
+| Glioma (254) | 0.763 | 0.673 | 98.0% |
+
+Outline drawn on normal slices: 1 of 140 (BRISC test), 12% of 400 (Kaggle test, other sources); the demo runs the outline only when the classifier reports a tumor. The browser model (fp16 weights, no flip averaging) gives Dice 0.854.
+
 Accuracy on the Kaggle test is ~96% whichever way the training data is extended; adding other sequences changes safety (missed tumors, other sources, other sequences), not this number.
 
 ## Notebooks (Kaggle, T4)
@@ -45,6 +58,8 @@ Accuracy on the Kaggle test is ~96% whichever way the training data is extended;
 | 06 | 384 px models, choices on BRISC, Kaggle scored once |
 | 07-08 | T1/T2 data (Feltrin), three seeds, ensembles, abstention |
 | 09 | ONNX export with class-activation output, int8 check |
+| 10 | Pack the demo model as text parts |
+| 11 | Tumor outline: U-Net on BRISC masks, same clean protocol, browser export |
 
 `notebooks/build_XX.py` generates each notebook. Results: `results/`. Data is downloaded inside the notebooks and not stored here.
 
