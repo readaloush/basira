@@ -360,7 +360,7 @@ $("showHeat").onchange = () => lastCam && drawHeat(lastCam[0], lastCam[1], lastC
 $("showOutline").onchange = drawOutline;
 $("toggle").onclick = e => e.stopPropagation();
 
-fetch("examples/examples.json").then(r => r.json()).then(ex => {
+fetch("examples/examples.json", {cache: "no-cache"}).then(r => r.json()).then(ex => {
   $("thumbs").innerHTML = ex.map((e, i) => `<button class="thumb" data-i="${i}" style="background-image:url('examples/${encodeURIComponent(e.file)}')" aria-label="Example ${i + 1}, labelled ${e.label}"></button>`).join("");
   document.querySelectorAll(".thumb").forEach(b => b.onclick = () => {
     const e = ex[+b.dataset.i], im = new Image(); im.crossOrigin = "anonymous";
